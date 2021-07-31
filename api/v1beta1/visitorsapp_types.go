@@ -24,24 +24,26 @@ import (
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
 // VisitorsAppSpec defines the desired state of VisitorsApp
+// +k8s:openapi-gen=true
 type VisitorsAppSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
-	// Foo is an example field of VisitorsApp. Edit visitorsapp_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	Size  int32  `json:"size"`
+	Title string `json:"title,omitempty"`
 }
 
 // VisitorsAppStatus defines the observed state of VisitorsApp
+// +k8s:openapi-gen=true
 type VisitorsAppStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	BackendImage  string `json:"backendImage,omitempty"`
+	FrontendImage string `json:"frontendImage,omitempty"`
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
 // VisitorsApp is the Schema for the visitorsapps API
+// +k8s:openapi-gen=true
+// +kubebuilder:subresource:status
 type VisitorsApp struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -50,6 +52,7 @@ type VisitorsApp struct {
 	Status VisitorsAppStatus `json:"status,omitempty"`
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 //+kubebuilder:object:root=true
 
 // VisitorsAppList contains a list of VisitorsApp

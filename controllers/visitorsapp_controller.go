@@ -18,11 +18,19 @@ package controllers
 
 import (
 	"context"
+	"fmt"
+	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	examplecomv1beta1 "github.com/ringdrx/visitors-operator/api/v1beta1"
 )
@@ -47,16 +55,108 @@ type VisitorsAppReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.9.2/pkg/reconcile
 func (r *VisitorsAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	log := ctrllog.FromContext(ctx)
+	log.Info("Reconciling VisitorsApp")
 
-	// your logic here
+	// Fetch the VisitorsApp instance
+	v := &examplecomv1beta1.VisitorsApp{}
+	err := r.Get(ctx, req.NamespacedName, v)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			// Request object not found, could have been deleted after reconcile request.
+			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
+			// Return and don't requeue
+			log.Info("VisitorsApp resource not found. Ignoring since object must be deleted")
+			return ctrl.Result{}, nil
+		}
+		// Error reading the object - requeue the request.
+		log.Error(err, "Failed to get VisitorsApp")
+		return ctrl.Result{}, err
+	}
 
-	return ctrl.Result{}, nil
+	var result *ctrl.Result
+
+	// == MySQL ==========
+	result, err = r.ensureSecret(ctx, req, v, r.mysqlAuthSecret(v))
+	if result != nil {
+		return *result, err
+	}
+
+	result, err = r.ensureDeployment(ctx, req, v, r.mysqlDeployment(v))
+	if result != nil {
+		return *result, err
+	}
+
+	result, err = r.ensureService(ctx, req, v, r.mysqlService(v))
+	if result != nil {
+		return *result, err
+	}
+
+	mysqlRunning := r.isMysqlUp(ctx, v)
+
+	if !mysqlRunning {
+		// If MySQL isn't running yet, requeue the reconcile
+		// to run again after a delay
+		delay := time.Second * time.Duration(5)
+
+		log.Info(fmt.Sprintf("MySQL isn't running, waiting for %s", delay))
+		return reconcile.Result{RequeueAfter: delay}, nil
+	}
+
+	// == Visitors Backend  ==========
+	result, err = r.ensureDeployment(ctx, req, v, r.backendDeployment(v))
+	if result != nil {
+		return *result, err
+	}
+
+	result, err = r.ensureService(ctx, req, v, r.backendService(v))
+	if result != nil {
+		return *result, err
+	}
+
+	err = r.updateBackendStatus(v)
+	if err != nil {
+		// Requeue the request if the status could not be updated
+		return reconcile.Result{}, err
+	}
+
+	result, err = r.handleBackendChanges(ctx, v)
+	if result != nil {
+		return *result, err
+	}
+
+	// == Visitors Frontend ==========
+	result, err = r.ensureDeployment(ctx, req, v, r.frontendDeployment(v))
+	if result != nil {
+		return *result, err
+	}
+
+	result, err = r.ensureService(ctx, req, v, r.frontendService(ctx, v))
+	if result != nil {
+		return *result, err
+	}
+
+	err = r.updateFrontendStatus(v)
+	if err != nil {
+		// Requeue the request
+		return reconcile.Result{}, err
+	}
+
+	result, err = r.handleFrontendChanges(ctx, v)
+	if result != nil {
+		return *result, err
+	}
+
+	// == Finish ==========
+	// Everything went fine, don't requeue
+	return reconcile.Result{}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *VisitorsAppReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&examplecomv1beta1.VisitorsApp{}).
+		Owns(&appsv1.Deployment{}).
+		Owns(&corev1.Service{}).
 		Complete(r)
 }
