@@ -135,7 +135,7 @@ func (r *VisitorsAppReconciler) isMysqlUp(ctx context.Context, v *examplecomv1be
 	log := ctrllog.FromContext(ctx)
 	deployment := &appsv1.Deployment{}
 
-	err := r.Get(context.TODO(), types.NamespacedName{
+	err := r.Get(ctx, types.NamespacedName{
 		Name:      mysqlDeploymentName(),
 		Namespace: v.Namespace,
 	}, deployment)

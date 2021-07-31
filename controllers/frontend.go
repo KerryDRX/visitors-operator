@@ -11,9 +11,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 const frontendPort = 3000
@@ -101,36 +101,57 @@ func (r *VisitorsAppReconciler) frontendService(ctx context.Context, v *examplec
 	return s
 }
 
-func (r *VisitorsAppReconciler) updateFrontendStatus(v *examplecomv1beta1.VisitorsApp) error {
+func (r *VisitorsAppReconciler) updateFrontendStatus(ctx context.Context, v *examplecomv1beta1.VisitorsApp) error {
 	v.Status.FrontendImage = frontendImage
-	err := r.Status().Update(context.TODO(), v)
+	err := r.Update(ctx, v)
 	return err
 }
 
-func (r *VisitorsAppReconciler) handleFrontendChanges(ctx context.Context, v *examplecomv1beta1.VisitorsApp) (*reconcile.Result, error) {
+func (r *VisitorsAppReconciler) handleFrontendChanges(ctx context.Context, v *examplecomv1beta1.VisitorsApp) (*ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
 	found := &appsv1.Deployment{}
-	err := r.Get(context.TODO(), types.NamespacedName{
+	err := r.Get(ctx, types.NamespacedName{
 		Name:      frontendDeploymentName(v),
 		Namespace: v.Namespace,
 	}, found)
 	if err != nil {
 		// The deployment may not have been created yet, so requeue
-		return &reconcile.Result{RequeueAfter: 5 * time.Second}, err
+		return &ctrl.Result{RequeueAfter: 5 * time.Second}, err
 	}
 
 	title := v.Spec.Title
+
+	if len((*found).Spec.Template.Spec.Containers[0].Env) == 0 {
+		if title == "" {
+			log.Info("Empty title")
+			return nil, nil
+		}
+		// If the title was specified, add it as an env variable
+		env := []corev1.EnvVar{}
+		env = append(env, corev1.EnvVar{
+			Name:  "REACT_APP_TITLE",
+			Value: title,
+		})
+		(*found).Spec.Template.Spec.Containers[0].Env = env
+		err = r.Update(ctx, found)
+		if err != nil {
+			log.Error(err, "Failed to update Deployment.", "Deployment.Namespace", found.Namespace, "Deployment.Name", found.Name)
+			return &ctrl.Result{}, err
+		}
+		// Spec updated - return and requeue
+		return &ctrl.Result{Requeue: true}, nil
+	}
 	existing := (*found).Spec.Template.Spec.Containers[0].Env[0].Value
 
 	if title != existing {
 		(*found).Spec.Template.Spec.Containers[0].Env[0].Value = title
-		err = r.Update(context.TODO(), found)
+		err = r.Update(ctx, found)
 		if err != nil {
 			log.Error(err, "Failed to update Deployment.", "Deployment.Namespace", found.Namespace, "Deployment.Name", found.Name)
-			return &reconcile.Result{}, err
+			return &ctrl.Result{}, err
 		}
 		// Spec updated - return and requeue
-		return &reconcile.Result{Requeue: true}, nil
+		return &ctrl.Result{Requeue: true}, nil
 	}
 
 	return nil, nil

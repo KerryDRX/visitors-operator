@@ -11,9 +11,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 const backendPort = 8000
@@ -121,36 +121,36 @@ func (r *VisitorsAppReconciler) backendService(v *examplecomv1beta1.VisitorsApp)
 	return s
 }
 
-func (r *VisitorsAppReconciler) updateBackendStatus(v *examplecomv1beta1.VisitorsApp) error {
+func (r *VisitorsAppReconciler) updateBackendStatus(ctx context.Context, v *examplecomv1beta1.VisitorsApp) error {
 	v.Status.BackendImage = backendImage
-	err := r.Status().Update(context.TODO(), v)
+	err := r.Update(ctx, v)
 	return err
 }
 
-func (r *VisitorsAppReconciler) handleBackendChanges(ctx context.Context, v *examplecomv1beta1.VisitorsApp) (*reconcile.Result, error) {
+func (r *VisitorsAppReconciler) handleBackendChanges(ctx context.Context, v *examplecomv1beta1.VisitorsApp) (*ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
 
 	found := &appsv1.Deployment{}
-	err := r.Get(context.TODO(), types.NamespacedName{
+	err := r.Get(ctx, types.NamespacedName{
 		Name:      backendDeploymentName(v),
 		Namespace: v.Namespace,
 	}, found)
 	if err != nil {
 		// The deployment may not have been created yet, so requeue
-		return &reconcile.Result{RequeueAfter: 5 * time.Second}, err
+		return &ctrl.Result{RequeueAfter: 5 * time.Second}, err
 	}
 
 	size := v.Spec.Size
 
 	if size != *found.Spec.Replicas {
 		found.Spec.Replicas = &size
-		err = r.Update(context.TODO(), found)
+		err = r.Update(ctx, found)
 		if err != nil {
 			log.Error(err, "Failed to update Deployment.", "Deployment.Namespace", found.Namespace, "Deployment.Name", found.Name)
-			return &reconcile.Result{}, err
+			return &ctrl.Result{}, err
 		}
 		// Spec updated - return and requeue
-		return &reconcile.Result{Requeue: true}, nil
+		return &ctrl.Result{Requeue: true}, nil
 	}
 
 	return nil, nil

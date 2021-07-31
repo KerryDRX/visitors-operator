@@ -30,7 +30,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	examplecomv1beta1 "github.com/ringdrx/visitors-operator/api/v1beta1"
 )
@@ -100,8 +99,10 @@ func (r *VisitorsAppReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		delay := time.Second * time.Duration(5)
 
 		log.Info(fmt.Sprintf("MySQL isn't running, waiting for %s", delay))
-		return reconcile.Result{RequeueAfter: delay}, nil
+		return ctrl.Result{RequeueAfter: delay}, nil
 	}
+
+	log.Info("Database setup completed.")
 
 	// == Visitors Backend  ==========
 	result, err = r.ensureDeployment(ctx, req, v, r.backendDeployment(v))
@@ -114,16 +115,18 @@ func (r *VisitorsAppReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return *result, err
 	}
 
-	err = r.updateBackendStatus(v)
+	err = r.updateBackendStatus(ctx, v)
 	if err != nil {
 		// Requeue the request if the status could not be updated
-		return reconcile.Result{}, err
+		return ctrl.Result{}, err
 	}
 
 	result, err = r.handleBackendChanges(ctx, v)
 	if result != nil {
 		return *result, err
 	}
+
+	log.Info("Backend setup completed.")
 
 	// == Visitors Frontend ==========
 	result, err = r.ensureDeployment(ctx, req, v, r.frontendDeployment(v))
@@ -136,10 +139,10 @@ func (r *VisitorsAppReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return *result, err
 	}
 
-	err = r.updateFrontendStatus(v)
+	err = r.updateFrontendStatus(ctx, v)
 	if err != nil {
 		// Requeue the request
-		return reconcile.Result{}, err
+		return ctrl.Result{}, err
 	}
 
 	result, err = r.handleFrontendChanges(ctx, v)
@@ -147,9 +150,12 @@ func (r *VisitorsAppReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return *result, err
 	}
 
+	log.Info("Frontend setup completed.")
+
 	// == Finish ==========
 	// Everything went fine, don't requeue
-	return reconcile.Result{}, nil
+	log.Info("Everything went fine, don't requeue.")
+	return ctrl.Result{}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
