@@ -3,4 +3,4 @@ kind: VisitorsApp
 metadata:
   name: visitorsapp-sample
 spec:
-  size: 2
+  size: 1
