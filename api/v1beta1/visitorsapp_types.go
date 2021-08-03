@@ -23,16 +23,26 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
+//DatabaseSecretUsername string `json:"databaseSecretUsername"`
+//DatabaseSecretPassword string `json:"databaseSecretPassword"`
+//DatabaseMySQLRootPassword int32  `json:"databaseMySQLRootPassword"`
+//DatabaseSize int32 `json:"databaseSize"`
+
 // VisitorsAppSpec defines the desired state of VisitorsApp
 // +k8s:openapi-gen=true
 type VisitorsAppSpec struct {
-	Size  int32  `json:"size"`
-	Title string `json:"title,omitempty"`
+	DatabaseImage           string `json:"databaseImage"`
+	BackendSize             int32  `json:"backendSize"`
+	BackendServiceNodePort  int32  `json:"backendServiceNodePort"`
+	FrontendTitle           string `json:"frontendTitle"`
+	FrontendSize            int32  `json:"frontendSize"`
+	FrontendServiceNodePort int32  `json:"frontendServiceNodePort"`
 }
 
 // VisitorsAppStatus defines the observed state of VisitorsApp
 // +k8s:openapi-gen=true
 type VisitorsAppStatus struct {
+	//DatabaseImage string `json:"databaseImage,omitempty"`
 	BackendImage  string `json:"backendImage,omitempty"`
 	FrontendImage string `json:"frontendImage,omitempty"`
 }

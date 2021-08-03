@@ -36,18 +36,35 @@ spec:
           spec:
             description: VisitorsAppSpec defines the desired state of VisitorsApp
             properties:
-              size:
+              backendServiceNodePort:
                 format: int32
                 type: integer
-              title:
+              backendSize:
+                format: int32
+                type: integer
+              databaseImage:
+                type: string
+              frontendServiceNodePort:
+                format: int32
+                type: integer
+              frontendSize:
+                format: int32
+                type: integer
+              frontendTitle:
                 type: string
             required:
-            - size
+            - backendServiceNodePort
+            - backendSize
+            - databaseImage
+            - frontendServiceNodePort
+            - frontendSize
+            - frontendTitle
             type: object
           status:
             description: VisitorsAppStatus defines the observed state of VisitorsApp
             properties:
               backendImage:
+                description: DatabaseImage string `json:"databaseImage,omitempty"`
                 type: string
               frontendImage:
                 type: string

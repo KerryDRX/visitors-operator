@@ -17,7 +17,6 @@ import (
 )
 
 const frontendPort = 3000
-const frontendServicePort = 30686
 const frontendImage = "jdob/visitors-webui:1.0.0"
 
 func frontendDeploymentName(v *examplecomv1beta1.VisitorsApp) string {
@@ -30,14 +29,15 @@ func frontendServiceName(v *examplecomv1beta1.VisitorsApp) string {
 
 func (r *VisitorsAppReconciler) frontendDeployment(v *examplecomv1beta1.VisitorsApp) *appsv1.Deployment {
 	labels := labels(v, "frontend")
-	size := int32(1)
+	frontendTitle := v.Spec.FrontendTitle
+	frontendSize := v.Spec.FrontendSize
 
 	// If the header was specified, add it as an env variable
 	env := []corev1.EnvVar{}
-	if v.Spec.Title != "" {
+	if frontendTitle != "" {
 		env = append(env, corev1.EnvVar{
 			Name:  "REACT_APP_TITLE",
-			Value: v.Spec.Title,
+			Value: frontendTitle,
 		})
 	}
 
@@ -47,7 +47,7 @@ func (r *VisitorsAppReconciler) frontendDeployment(v *examplecomv1beta1.Visitors
 			Namespace: v.Namespace,
 		},
 		Spec: appsv1.DeploymentSpec{
-			Replicas: &size,
+			Replicas: &frontendSize,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: labels,
 			},
@@ -74,9 +74,9 @@ func (r *VisitorsAppReconciler) frontendDeployment(v *examplecomv1beta1.Visitors
 	return dep
 }
 
-func (r *VisitorsAppReconciler) frontendService(ctx context.Context, v *examplecomv1beta1.VisitorsApp) *corev1.Service {
-	log := ctrllog.FromContext(ctx)
+func (r *VisitorsAppReconciler) frontendService(v *examplecomv1beta1.VisitorsApp) *corev1.Service {
 	labels := labels(v, "frontend")
+	frontendServiceNodePort := v.Spec.FrontendServiceNodePort
 
 	s := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -88,14 +88,12 @@ func (r *VisitorsAppReconciler) frontendService(ctx context.Context, v *examplec
 			Ports: []corev1.ServicePort{{
 				Protocol:   corev1.ProtocolTCP,
 				Port:       frontendPort,
-				TargetPort: intstr.FromInt(frontendPort),
-				NodePort:   frontendServicePort,
+				TargetPort: intstr.FromInt(int(frontendPort)),
+				NodePort:   frontendServiceNodePort,
 			}},
 			Type: corev1.ServiceTypeNodePort,
 		},
 	}
-
-	log.Info("Service Spec", "Service.Name", s.ObjectMeta.Name)
 
 	controllerutil.SetControllerReference(v, s, r.Scheme)
 	return s
@@ -109,45 +107,81 @@ func (r *VisitorsAppReconciler) updateFrontendStatus(ctx context.Context, v *exa
 
 func (r *VisitorsAppReconciler) handleFrontendChanges(ctx context.Context, v *examplecomv1beta1.VisitorsApp) (*ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
-	found := &appsv1.Deployment{}
+
+	foundDeployment := &appsv1.Deployment{}
+	foundService := &corev1.Service{}
+
 	err := r.Get(ctx, types.NamespacedName{
 		Name:      frontendDeploymentName(v),
 		Namespace: v.Namespace,
-	}, found)
+	}, foundDeployment)
 	if err != nil {
 		// The deployment may not have been created yet, so requeue
 		return &ctrl.Result{RequeueAfter: 5 * time.Second}, err
 	}
+	err = r.Get(ctx, types.NamespacedName{
+		Name:      frontendServiceName(v),
+		Namespace: v.Namespace,
+	}, foundService)
+	if err != nil {
+		// The service may not have been created yet, so requeue
+		return &ctrl.Result{RequeueAfter: 5 * time.Second}, err
+	}
 
-	title := v.Spec.Title
-
-	if len((*found).Spec.Template.Spec.Containers[0].Env) == 0 {
-		if title == "" {
-			log.Info("Empty title")
+	frontendTitle := v.Spec.FrontendTitle
+	if len((*foundDeployment).Spec.Template.Spec.Containers[0].Env) == 0 {
+		if frontendTitle == "" {
 			return nil, nil
 		}
 		// If the title was specified, add it as an env variable
 		env := []corev1.EnvVar{}
 		env = append(env, corev1.EnvVar{
 			Name:  "REACT_APP_TITLE",
-			Value: title,
+			Value: frontendTitle,
 		})
-		(*found).Spec.Template.Spec.Containers[0].Env = env
-		err = r.Update(ctx, found)
+		(*foundDeployment).Spec.Template.Spec.Containers[0].Env = env
+		err = r.Update(ctx, foundDeployment)
 		if err != nil {
-			log.Error(err, "Failed to update Deployment.", "Deployment.Namespace", found.Namespace, "Deployment.Name", found.Name)
+			log.Error(err, "Failed to update Deployment.", "Deployment.Namespace", foundDeployment.Namespace, "Deployment.Name", foundDeployment.Name)
 			return &ctrl.Result{}, err
 		}
 		// Spec updated - return and requeue
 		return &ctrl.Result{Requeue: true}, nil
 	}
-	existing := (*found).Spec.Template.Spec.Containers[0].Env[0].Value
-
-	if title != existing {
-		(*found).Spec.Template.Spec.Containers[0].Env[0].Value = title
-		err = r.Update(ctx, found)
+	existingFrontendTitle := (*foundDeployment).Spec.Template.Spec.Containers[0].Env[0].Value
+	if frontendTitle != existingFrontendTitle {
+		(*foundDeployment).Spec.Template.Spec.Containers[0].Env[0].Value = frontendTitle
+		err = r.Update(ctx, foundDeployment)
 		if err != nil {
-			log.Error(err, "Failed to update Deployment.", "Deployment.Namespace", found.Namespace, "Deployment.Name", found.Name)
+			log.Error(err, "Failed to update Deployment.", "Deployment.Namespace", foundDeployment.Namespace, "Deployment.Name", foundDeployment.Name)
+			return &ctrl.Result{}, err
+		}
+		// Spec updated - return and requeue
+		return &ctrl.Result{Requeue: true}, nil
+	}
+
+	frontendSize := v.Spec.FrontendSize
+	frontendServiceNodePort := v.Spec.FrontendServiceNodePort
+
+	existingFrontendSize := *foundDeployment.Spec.Replicas
+	existingFrontendServiceNodePort := (*foundService).Spec.Ports[0].NodePort
+
+	if frontendSize != existingFrontendSize {
+		foundDeployment.Spec.Replicas = &frontendSize
+		err = r.Update(ctx, foundDeployment)
+		if err != nil {
+			log.Error(err, "Failed to update Deployment.", "Deployment.Namespace", foundDeployment.Namespace, "Deployment.Name", foundDeployment.Name)
+			return &ctrl.Result{}, err
+		}
+		// Spec updated - return and requeue
+		return &ctrl.Result{Requeue: true}, nil
+	}
+
+	if frontendServiceNodePort != existingFrontendServiceNodePort {
+		(*foundService).Spec.Ports[0].NodePort = frontendServiceNodePort
+		err = r.Update(ctx, foundService)
+		if err != nil {
+			log.Error(err, "Failed to update Service.", "Service.Namespace", foundService.Namespace, "Service.Name", foundService.Name)
 			return &ctrl.Result{}, err
 		}
 		// Spec updated - return and requeue

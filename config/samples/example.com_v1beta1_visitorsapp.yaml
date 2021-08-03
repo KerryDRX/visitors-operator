@@ -3,4 +3,9 @@ kind: VisitorsApp
 metadata:
   name: visitorsapp-sample
 spec:
-  size: 1
+  databaseImage: mysql:5.7
+  backendSize: 2
+  backendServiceNodePort: 30685
+  frontendTitle: ~~ My Visitors App ~~
+  frontendSize: 2
+  frontendServiceNodePort: 30686

@@ -106,6 +106,17 @@ func (r *VisitorsAppReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{RequeueAfter: delay}, nil
 	}
 
+	err = r.updateDatabaseStatus(ctx, v)
+	if err != nil {
+		// Requeue the request if the status could not be updated
+		return ctrl.Result{}, err
+	}
+
+	result, err = r.handleDatabaseChanges(ctx, v)
+	if result != nil {
+		return *result, err
+	}
+
 	log.Info("Database setup completed.")
 
 	// == Visitors Backend  ==========
@@ -138,7 +149,7 @@ func (r *VisitorsAppReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return *result, err
 	}
 
-	result, err = r.ensureService(ctx, req, v, r.frontendService(ctx, v))
+	result, err = r.ensureService(ctx, req, v, r.frontendService(v))
 	if result != nil {
 		return *result, err
 	}

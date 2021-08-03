@@ -17,7 +17,6 @@ import (
 )
 
 const backendPort = 8000
-const backendServicePort = 30685
 const backendImage = "jdob/visitors-service:1.0.0"
 
 func backendDeploymentName(v *examplecomv1beta1.VisitorsApp) string {
@@ -30,7 +29,7 @@ func backendServiceName(v *examplecomv1beta1.VisitorsApp) string {
 
 func (r *VisitorsAppReconciler) backendDeployment(v *examplecomv1beta1.VisitorsApp) *appsv1.Deployment {
 	labels := labels(v, "backend")
-	size := v.Spec.Size
+	backendSize := v.Spec.BackendSize
 
 	userSecret := &corev1.EnvVarSource{
 		SecretKeyRef: &corev1.SecretKeySelector{
@@ -52,7 +51,7 @@ func (r *VisitorsAppReconciler) backendDeployment(v *examplecomv1beta1.VisitorsA
 			Namespace: v.Namespace,
 		},
 		Spec: appsv1.DeploymentSpec{
-			Replicas: &size,
+			Replicas: &backendSize,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: labels,
 			},
@@ -99,6 +98,7 @@ func (r *VisitorsAppReconciler) backendDeployment(v *examplecomv1beta1.VisitorsA
 
 func (r *VisitorsAppReconciler) backendService(v *examplecomv1beta1.VisitorsApp) *corev1.Service {
 	labels := labels(v, "backend")
+	backendServiceNodePort := v.Spec.BackendServiceNodePort
 
 	s := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -110,8 +110,8 @@ func (r *VisitorsAppReconciler) backendService(v *examplecomv1beta1.VisitorsApp)
 			Ports: []corev1.ServicePort{{
 				Protocol:   corev1.ProtocolTCP,
 				Port:       backendPort,
-				TargetPort: intstr.FromInt(backendPort),
-				NodePort:   backendServicePort,
+				TargetPort: intstr.FromInt(int(backendPort)),
+				NodePort:   backendServiceNodePort,
 			}},
 			Type: corev1.ServiceTypeNodePort,
 		},
@@ -130,23 +130,48 @@ func (r *VisitorsAppReconciler) updateBackendStatus(ctx context.Context, v *exam
 func (r *VisitorsAppReconciler) handleBackendChanges(ctx context.Context, v *examplecomv1beta1.VisitorsApp) (*ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
 
-	found := &appsv1.Deployment{}
+	foundDeployment := &appsv1.Deployment{}
+	foundService := &corev1.Service{}
+
 	err := r.Get(ctx, types.NamespacedName{
 		Name:      backendDeploymentName(v),
 		Namespace: v.Namespace,
-	}, found)
+	}, foundDeployment)
 	if err != nil {
 		// The deployment may not have been created yet, so requeue
 		return &ctrl.Result{RequeueAfter: 5 * time.Second}, err
 	}
+	err = r.Get(ctx, types.NamespacedName{
+		Name:      backendServiceName(v),
+		Namespace: v.Namespace,
+	}, foundService)
+	if err != nil {
+		// The service may not have been created yet, so requeue
+		return &ctrl.Result{RequeueAfter: 5 * time.Second}, err
+	}
 
-	size := v.Spec.Size
+	backendSize := v.Spec.BackendSize
+	backendServiceNodePort := v.Spec.BackendServiceNodePort
 
-	if size != *found.Spec.Replicas {
-		found.Spec.Replicas = &size
-		err = r.Update(ctx, found)
+	existingBackendSize := *foundDeployment.Spec.Replicas
+	existingBackendServiceNodePort := (*foundService).Spec.Ports[0].NodePort
+
+	if backendSize != existingBackendSize {
+		foundDeployment.Spec.Replicas = &backendSize
+		err = r.Update(ctx, foundDeployment)
 		if err != nil {
-			log.Error(err, "Failed to update Deployment.", "Deployment.Namespace", found.Namespace, "Deployment.Name", found.Name)
+			log.Error(err, "Failed to update Deployment.", "Deployment.Namespace", foundDeployment.Namespace, "Deployment.Name", foundDeployment.Name)
+			return &ctrl.Result{}, err
+		}
+		// Spec updated - return and requeue
+		return &ctrl.Result{Requeue: true}, nil
+	}
+
+	if backendServiceNodePort != existingBackendServiceNodePort {
+		(*foundService).Spec.Ports[0].NodePort = backendServiceNodePort
+		err = r.Update(ctx, foundService)
+		if err != nil {
+			log.Error(err, "Failed to update Service.", "Service.Namespace", foundService.Namespace, "Service.Name", foundService.Name)
 			return &ctrl.Result{}, err
 		}
 		// Spec updated - return and requeue

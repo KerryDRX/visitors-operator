@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"time"
 
 	examplecomv1beta1 "github.com/ringdrx/visitors-operator/api/v1beta1"
 
@@ -9,9 +10,12 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 )
+
+const databasePort = 3000
 
 func mysqlDeploymentName() string {
 	return "mysql"
@@ -44,6 +48,7 @@ func (r *VisitorsAppReconciler) mysqlAuthSecret(v *examplecomv1beta1.VisitorsApp
 func (r *VisitorsAppReconciler) mysqlDeployment(v *examplecomv1beta1.VisitorsApp) *appsv1.Deployment {
 	labels := labels(v, "mysql")
 	size := int32(1)
+	databaseImage := v.Spec.DatabaseImage
 
 	userSecret := &corev1.EnvVarSource{
 		SecretKeyRef: &corev1.SecretKeySelector{
@@ -75,10 +80,10 @@ func (r *VisitorsAppReconciler) mysqlDeployment(v *examplecomv1beta1.VisitorsApp
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{{
-						Image: "mysql:5.7",
+						Image: databaseImage,
 						Name:  "visitors-mysql",
 						Ports: []corev1.ContainerPort{{
-							ContainerPort: 3306,
+							ContainerPort: databasePort,
 							Name:          "mysql",
 						}},
 						Env: []corev1.EnvVar{
@@ -120,7 +125,7 @@ func (r *VisitorsAppReconciler) mysqlService(v *examplecomv1beta1.VisitorsApp) *
 		Spec: corev1.ServiceSpec{
 			Selector: labels,
 			Ports: []corev1.ServicePort{{
-				Port: 3306,
+				Port: databasePort,
 			}},
 			ClusterIP: "None",
 		},
@@ -150,4 +155,51 @@ func (r *VisitorsAppReconciler) isMysqlUp(ctx context.Context, v *examplecomv1be
 	}
 
 	return false
+}
+
+func (r *VisitorsAppReconciler) updateDatabaseStatus(ctx context.Context, v *examplecomv1beta1.VisitorsApp) error {
+	// v.Status.DatabaseImage = v.Spec.DatabaseImage
+	err := r.Update(ctx, v)
+	return err
+}
+
+func (r *VisitorsAppReconciler) handleDatabaseChanges(ctx context.Context, v *examplecomv1beta1.VisitorsApp) (*ctrl.Result, error) {
+	log := ctrllog.FromContext(ctx)
+
+	foundDeployment := &appsv1.Deployment{}
+	foundService := &corev1.Service{}
+
+	err := r.Get(ctx, types.NamespacedName{
+		Name:      mysqlDeploymentName(),
+		Namespace: v.Namespace,
+	}, foundDeployment)
+	if err != nil {
+		// The deployment may not have been created yet, so requeue
+		return &ctrl.Result{RequeueAfter: 5 * time.Second}, err
+	}
+	err = r.Get(ctx, types.NamespacedName{
+		Name:      mysqlServiceName(),
+		Namespace: v.Namespace,
+	}, foundService)
+	if err != nil {
+		// The service may not have been created yet, so requeue
+		return &ctrl.Result{RequeueAfter: 5 * time.Second}, err
+	}
+
+	databaseImage := v.Spec.DatabaseImage
+
+	existingDatabaseImage := (*foundDeployment).Spec.Template.Spec.Containers[0].Image
+
+	if databaseImage != existingDatabaseImage {
+		(*foundDeployment).Spec.Template.Spec.Containers[0].Image = databaseImage
+		err = r.Update(ctx, foundDeployment)
+		if err != nil {
+			log.Error(err, "Failed to update Deployment.", "Deployment.Namespace", foundDeployment.Namespace, "Deployment.Name", foundDeployment.Name)
+			return &ctrl.Result{}, err
+		}
+		// Spec updated - return and requeue
+		return &ctrl.Result{Requeue: true}, nil
+	}
+
+	return nil, nil
 }

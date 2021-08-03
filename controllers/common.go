@@ -13,7 +13,8 @@ import (
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-func (r *VisitorsAppReconciler) ensureDeployment(ctx context.Context, request ctrl.Request,
+func (r *VisitorsAppReconciler) ensureDeployment(ctx context.Context,
+	request ctrl.Request,
 	instance *examplecomv1beta1.VisitorsApp,
 	dep *appsv1.Deployment,
 ) (*ctrl.Result, error) {
@@ -48,7 +49,8 @@ func (r *VisitorsAppReconciler) ensureDeployment(ctx context.Context, request ct
 	return nil, nil
 }
 
-func (r *VisitorsAppReconciler) ensureService(ctx context.Context, request ctrl.Request,
+func (r *VisitorsAppReconciler) ensureService(ctx context.Context,
+	request ctrl.Request,
 	instance *examplecomv1beta1.VisitorsApp,
 	s *corev1.Service,
 ) (*ctrl.Result, error) {
@@ -82,7 +84,8 @@ func (r *VisitorsAppReconciler) ensureService(ctx context.Context, request ctrl.
 	return nil, nil
 }
 
-func (r *VisitorsAppReconciler) ensureSecret(ctx context.Context, request ctrl.Request,
+func (r *VisitorsAppReconciler) ensureSecret(ctx context.Context,
+	request ctrl.Request,
 	instance *examplecomv1beta1.VisitorsApp,
 	s *corev1.Secret,
 ) (*ctrl.Result, error) {
