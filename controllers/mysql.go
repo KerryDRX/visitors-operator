@@ -17,7 +17,7 @@ import (
 
 const databasePort = 3000
 
-func mysqlDeploymentName() string {
+func mysqlStatefulSetName() string {
 	return "mysql"
 }
 
@@ -27,6 +27,14 @@ func mysqlServiceName() string {
 
 func mysqlAuthName() string {
 	return "mysql-auth"
+}
+
+func mysqlVolumeName() string {
+	return "mysql-volume"
+}
+
+func mysqlMountPath() string {
+	return "//var/lib/mysql"
 }
 
 func (r *VisitorsAppReconciler) mysqlAuthSecret(v *examplecomv1beta1.VisitorsApp) *corev1.Secret {
@@ -45,10 +53,13 @@ func (r *VisitorsAppReconciler) mysqlAuthSecret(v *examplecomv1beta1.VisitorsApp
 	return secret
 }
 
-func (r *VisitorsAppReconciler) mysqlDeployment(v *examplecomv1beta1.VisitorsApp) *appsv1.Deployment {
+func (r *VisitorsAppReconciler) mysqlStatefulSet(v *examplecomv1beta1.VisitorsApp) *appsv1.StatefulSet {
 	labels := labels(v, "mysql")
 	size := int32(1)
-	databaseImage := v.Spec.DatabaseImage
+	databaseImage := "mysql:" + v.Spec.DatabaseVersion
+	databaseHostPath := v.Spec.DatabaseHostPath
+	databaseMySQLRootPassword := v.Spec.DatabaseMySQLRootPassword
+	hostPathType := corev1.HostPathDirectoryOrCreate
 
 	userSecret := &corev1.EnvVarSource{
 		SecretKeyRef: &corev1.SecretKeySelector{
@@ -64,16 +75,17 @@ func (r *VisitorsAppReconciler) mysqlDeployment(v *examplecomv1beta1.VisitorsApp
 		},
 	}
 
-	dep := &appsv1.Deployment{
+	sts := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      mysqlDeploymentName(),
+			Name:      mysqlStatefulSetName(),
 			Namespace: v.Namespace,
 		},
-		Spec: appsv1.DeploymentSpec{
+		Spec: appsv1.StatefulSetSpec{
 			Replicas: &size,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: labels,
 			},
+			ServiceName: mysqlServiceName(),
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: labels,
@@ -89,7 +101,7 @@ func (r *VisitorsAppReconciler) mysqlDeployment(v *examplecomv1beta1.VisitorsApp
 						Env: []corev1.EnvVar{
 							{
 								Name:  "MYSQL_ROOT_PASSWORD",
-								Value: "password",
+								Value: databaseMySQLRootPassword,
 							},
 							{
 								Name:  "MYSQL_DATABASE",
@@ -104,14 +116,27 @@ func (r *VisitorsAppReconciler) mysqlDeployment(v *examplecomv1beta1.VisitorsApp
 								ValueFrom: passwordSecret,
 							},
 						},
+						VolumeMounts: []corev1.VolumeMount{{
+							Name:      mysqlVolumeName(),
+							MountPath: mysqlMountPath(),
+						}},
+					}},
+					Volumes: []corev1.Volume{{
+						Name: mysqlVolumeName(),
+						VolumeSource: corev1.VolumeSource{
+							HostPath: &corev1.HostPathVolumeSource{
+								Path: databaseHostPath,
+								Type: &hostPathType,
+							},
+						},
 					}},
 				},
 			},
 		},
 	}
 
-	controllerutil.SetControllerReference(v, dep, r.Scheme)
-	return dep
+	controllerutil.SetControllerReference(v, sts, r.Scheme)
+	return sts
 }
 
 func (r *VisitorsAppReconciler) mysqlService(v *examplecomv1beta1.VisitorsApp) *corev1.Service {
@@ -135,22 +160,22 @@ func (r *VisitorsAppReconciler) mysqlService(v *examplecomv1beta1.VisitorsApp) *
 	return s
 }
 
-// Returns whether or not the MySQL deployment is running
+// Returns whether or not the MySQL statefulset is running
 func (r *VisitorsAppReconciler) isMysqlUp(ctx context.Context, v *examplecomv1beta1.VisitorsApp) bool {
 	log := ctrllog.FromContext(ctx)
-	deployment := &appsv1.Deployment{}
+	statefulset := &appsv1.StatefulSet{}
 
 	err := r.Get(ctx, types.NamespacedName{
-		Name:      mysqlDeploymentName(),
+		Name:      mysqlStatefulSetName(),
 		Namespace: v.Namespace,
-	}, deployment)
+	}, statefulset)
 
 	if err != nil {
-		log.Error(err, "Deployment mysql not found")
+		log.Error(err, "StatefulSet mysql not found")
 		return false
 	}
 
-	if deployment.Status.ReadyReplicas == 1 {
+	if statefulset.Status.ReadyReplicas == 1 {
 		return true
 	}
 
@@ -158,7 +183,7 @@ func (r *VisitorsAppReconciler) isMysqlUp(ctx context.Context, v *examplecomv1be
 }
 
 func (r *VisitorsAppReconciler) updateDatabaseStatus(ctx context.Context, v *examplecomv1beta1.VisitorsApp) error {
-	// v.Status.DatabaseImage = v.Spec.DatabaseImage
+	v.Status.DatabaseImage = "mysql:" + v.Spec.DatabaseVersion
 	err := r.Update(ctx, v)
 	return err
 }
@@ -166,18 +191,9 @@ func (r *VisitorsAppReconciler) updateDatabaseStatus(ctx context.Context, v *exa
 func (r *VisitorsAppReconciler) handleDatabaseChanges(ctx context.Context, v *examplecomv1beta1.VisitorsApp) (*ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
 
-	foundDeployment := &appsv1.Deployment{}
 	foundService := &corev1.Service{}
-
+	foundStatefulSet := &appsv1.StatefulSet{}
 	err := r.Get(ctx, types.NamespacedName{
-		Name:      mysqlDeploymentName(),
-		Namespace: v.Namespace,
-	}, foundDeployment)
-	if err != nil {
-		// The deployment may not have been created yet, so requeue
-		return &ctrl.Result{RequeueAfter: 5 * time.Second}, err
-	}
-	err = r.Get(ctx, types.NamespacedName{
 		Name:      mysqlServiceName(),
 		Namespace: v.Namespace,
 	}, foundService)
@@ -185,18 +201,72 @@ func (r *VisitorsAppReconciler) handleDatabaseChanges(ctx context.Context, v *ex
 		// The service may not have been created yet, so requeue
 		return &ctrl.Result{RequeueAfter: 5 * time.Second}, err
 	}
+	err = r.Get(ctx, types.NamespacedName{
+		Name:      mysqlStatefulSetName(),
+		Namespace: v.Namespace,
+	}, foundStatefulSet)
+	if err != nil {
+		// The statefulset may not have been created yet, so requeue
+		return &ctrl.Result{RequeueAfter: 5 * time.Second}, err
+	}
 
-	databaseImage := v.Spec.DatabaseImage
+	databaseMySQLRootPassword := v.Spec.DatabaseMySQLRootPassword
+	databaseImage := "mysql:" + v.Spec.DatabaseVersion
+	databaseHostPath := v.Spec.DatabaseHostPath
 
-	existingDatabaseImage := (*foundDeployment).Spec.Template.Spec.Containers[0].Image
+	existingDatabaseMySQLRootPassword := (*foundStatefulSet).Spec.Template.Spec.Containers[0].Env[0].Value
+	existingDatabaseImage := (*foundStatefulSet).Spec.Template.Spec.Containers[0].Image
+	existingDatabaseHostPath := (*foundStatefulSet).Spec.Template.Spec.Volumes[0].VolumeSource.HostPath.Path
 
-	if databaseImage != existingDatabaseImage {
-		(*foundDeployment).Spec.Template.Spec.Containers[0].Image = databaseImage
-		err = r.Update(ctx, foundDeployment)
+	if databaseMySQLRootPassword != existingDatabaseMySQLRootPassword {
+		(*foundStatefulSet).Spec.Template.Spec.Containers[0].Env[0].Value = databaseMySQLRootPassword
+		err = r.Update(ctx, foundStatefulSet)
 		if err != nil {
-			log.Error(err, "Failed to update Deployment.", "Deployment.Namespace", foundDeployment.Namespace, "Deployment.Name", foundDeployment.Name)
+			log.Error(err, "Failed to update StatefulSet.", "StatefulSet.Namespace", foundStatefulSet.Namespace, "StatefulSet.Name", foundStatefulSet.Name)
 			return &ctrl.Result{}, err
 		}
+		// Spec updated - return and requeue
+		return &ctrl.Result{Requeue: true}, nil
+	}
+
+	if databaseImage != existingDatabaseImage {
+		(*foundStatefulSet).Spec.Template.Spec.Containers[0].Image = databaseImage
+		err = r.Update(ctx, foundStatefulSet)
+		if err != nil {
+			log.Error(err, "Failed to update StatefulSet.", "StatefulSet.Namespace", foundStatefulSet.Namespace, "StatefulSet.Name", foundStatefulSet.Name)
+			return &ctrl.Result{}, err
+		}
+		// Spec updated - return and requeue
+		return &ctrl.Result{Requeue: true}, nil
+	}
+
+	if databaseHostPath != existingDatabaseHostPath {
+		(*foundStatefulSet).Spec.Template.Spec.Volumes[0].VolumeSource.HostPath.Path = databaseHostPath
+		err = r.Update(ctx, foundStatefulSet)
+		if err != nil {
+			log.Error(err, "Failed to update StatefulSet.", "StatefulSet.Namespace", foundStatefulSet.Namespace, "StatefulSet.Name", foundStatefulSet.Name)
+			return &ctrl.Result{}, err
+		}
+
+		// Updata Backend When Database HostPath Is Modified
+		log.Info("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+		foundBackendDeployment := &appsv1.Deployment{}
+		err := r.Get(ctx, types.NamespacedName{
+			Name:      backendDeploymentName(v),
+			Namespace: v.Namespace,
+		}, foundBackendDeployment)
+		if err != nil {
+			// The deployment may not have been created yet, so requeue
+			return &ctrl.Result{RequeueAfter: 5 * time.Second}, err
+		}
+		zero := int32(0)
+		foundBackendDeployment.Spec.Replicas = &zero
+		err = r.Update(ctx, foundBackendDeployment)
+		if err != nil {
+			log.Error(err, "Failed to update Deployment.", "Deployment.Namespace", foundBackendDeployment.Namespace, "Deployment.Name", foundBackendDeployment.Name)
+			return &ctrl.Result{}, err
+		}
+
 		// Spec updated - return and requeue
 		return &ctrl.Result{Requeue: true}, nil
 	}

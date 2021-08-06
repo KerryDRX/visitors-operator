@@ -118,6 +118,42 @@ func (r *VisitorsAppReconciler) ensureSecret(ctx context.Context,
 	return nil, nil
 }
 
+func (r *VisitorsAppReconciler) ensureStatefulSet(ctx context.Context,
+	request ctrl.Request,
+	instance *examplecomv1beta1.VisitorsApp,
+	sts *appsv1.StatefulSet,
+) (*ctrl.Result, error) {
+	log := ctrllog.FromContext(ctx)
+
+	// See if statefulset already exists and create if it doesn't
+	found := &appsv1.StatefulSet{}
+	err := r.Get(ctx, types.NamespacedName{
+		Name:      sts.Name,
+		Namespace: instance.Namespace,
+	}, found)
+	if err != nil && errors.IsNotFound(err) {
+
+		// Create the statefulset
+		log.Info("Creating a new StatefulSet", "StatefulSet.Namespace", sts.Namespace, "StatefulSet.Name", sts.Name)
+		err = r.Create(ctx, sts)
+
+		if err != nil {
+			// StatefulSet failed
+			log.Error(err, "Failed to create new StatefulSet", "StatefulSet.Namespace", sts.Namespace, "StatefulSet.Name", sts.Name)
+			return &ctrl.Result{}, err
+		} else {
+			// StatefulSet was successful
+			return nil, nil
+		}
+	} else if err != nil {
+		// Error that isn't due to the statefulset not existing
+		log.Error(err, "Failed to get StatefulSet")
+		return &ctrl.Result{}, err
+	}
+
+	return nil, nil
+}
+
 func labels(v *examplecomv1beta1.VisitorsApp, tier string) map[string]string {
 	return map[string]string{
 		"app":             "visitors",

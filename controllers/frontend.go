@@ -34,13 +34,10 @@ func (r *VisitorsAppReconciler) frontendDeployment(v *examplecomv1beta1.Visitors
 
 	// If the header was specified, add it as an env variable
 	env := []corev1.EnvVar{}
-	if frontendTitle != "" {
-		env = append(env, corev1.EnvVar{
-			Name:  "REACT_APP_TITLE",
-			Value: frontendTitle,
-		})
-	}
-
+	env = append(env, corev1.EnvVar{
+		Name:  "REACT_APP_TITLE",
+		Value: frontendTitle,
+	})
 	dep := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      frontendDeploymentName(v),
@@ -129,26 +126,13 @@ func (r *VisitorsAppReconciler) handleFrontendChanges(ctx context.Context, v *ex
 	}
 
 	frontendTitle := v.Spec.FrontendTitle
-	if len((*foundDeployment).Spec.Template.Spec.Containers[0].Env) == 0 {
-		if frontendTitle == "" {
-			return nil, nil
-		}
-		// If the title was specified, add it as an env variable
-		env := []corev1.EnvVar{}
-		env = append(env, corev1.EnvVar{
-			Name:  "REACT_APP_TITLE",
-			Value: frontendTitle,
-		})
-		(*foundDeployment).Spec.Template.Spec.Containers[0].Env = env
-		err = r.Update(ctx, foundDeployment)
-		if err != nil {
-			log.Error(err, "Failed to update Deployment.", "Deployment.Namespace", foundDeployment.Namespace, "Deployment.Name", foundDeployment.Name)
-			return &ctrl.Result{}, err
-		}
-		// Spec updated - return and requeue
-		return &ctrl.Result{Requeue: true}, nil
-	}
+	frontendSize := v.Spec.FrontendSize
+	frontendServiceNodePort := v.Spec.FrontendServiceNodePort
+
 	existingFrontendTitle := (*foundDeployment).Spec.Template.Spec.Containers[0].Env[0].Value
+	existingFrontendSize := *foundDeployment.Spec.Replicas
+	existingFrontendServiceNodePort := (*foundService).Spec.Ports[0].NodePort
+
 	if frontendTitle != existingFrontendTitle {
 		(*foundDeployment).Spec.Template.Spec.Containers[0].Env[0].Value = frontendTitle
 		err = r.Update(ctx, foundDeployment)
@@ -159,12 +143,6 @@ func (r *VisitorsAppReconciler) handleFrontendChanges(ctx context.Context, v *ex
 		// Spec updated - return and requeue
 		return &ctrl.Result{Requeue: true}, nil
 	}
-
-	frontendSize := v.Spec.FrontendSize
-	frontendServiceNodePort := v.Spec.FrontendServiceNodePort
-
-	existingFrontendSize := *foundDeployment.Spec.Replicas
-	existingFrontendServiceNodePort := (*foundService).Spec.Ports[0].NodePort
 
 	if frontendSize != existingFrontendSize {
 		foundDeployment.Spec.Replicas = &frontendSize

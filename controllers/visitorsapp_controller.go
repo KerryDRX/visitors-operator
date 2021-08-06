@@ -44,6 +44,7 @@ type VisitorsAppReconciler struct {
 //+kubebuilder:rbac:groups=example.com.my.domain,resources=visitorsapps/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=example.com.my.domain,resources=visitorsapps/finalizers,verbs=update
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;
@@ -85,12 +86,12 @@ func (r *VisitorsAppReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return *result, err
 	}
 
-	result, err = r.ensureDeployment(ctx, req, v, r.mysqlDeployment(v))
+	result, err = r.ensureService(ctx, req, v, r.mysqlService(v))
 	if result != nil {
 		return *result, err
 	}
 
-	result, err = r.ensureService(ctx, req, v, r.mysqlService(v))
+	result, err = r.ensureStatefulSet(ctx, req, v, r.mysqlStatefulSet(v))
 	if result != nil {
 		return *result, err
 	}
@@ -178,6 +179,7 @@ func (r *VisitorsAppReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&examplecomv1beta1.VisitorsApp{}).
 		Owns(&appsv1.Deployment{}).
+		Owns(&appsv1.StatefulSet{}).
 		Owns(&corev1.Service{}).
 		Complete(r)
 }

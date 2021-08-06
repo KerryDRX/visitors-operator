@@ -38,24 +38,36 @@ spec:
             properties:
               backendServiceNodePort:
                 format: int32
+                maximum: 32767
+                minimum: 30000
                 type: integer
               backendSize:
                 format: int32
+                minimum: 1
                 type: integer
-              databaseImage:
+              databaseHostPath:
+                type: string
+              databaseMySQLRootPassword:
+                type: string
+              databaseVersion:
                 type: string
               frontendServiceNodePort:
                 format: int32
+                maximum: 32767
+                minimum: 30000
                 type: integer
               frontendSize:
                 format: int32
+                minimum: 1
                 type: integer
               frontendTitle:
                 type: string
             required:
             - backendServiceNodePort
             - backendSize
-            - databaseImage
+            - databaseHostPath
+            - databaseMySQLRootPassword
+            - databaseVersion
             - frontendServiceNodePort
             - frontendSize
             - frontendTitle
@@ -64,7 +76,8 @@ spec:
             description: VisitorsAppStatus defines the observed state of VisitorsApp
             properties:
               backendImage:
-                description: DatabaseImage string `json:"databaseImage,omitempty"`
+                type: string
+              databaseImage:
                 type: string
               frontendImage:
                 type: string

@@ -23,37 +23,47 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-//DatabaseSecretUsername string `json:"databaseSecretUsername"`
-//DatabaseSecretPassword string `json:"databaseSecretPassword"`
-//DatabaseMySQLRootPassword int32  `json:"databaseMySQLRootPassword"`
 //DatabaseSize int32 `json:"databaseSize"`
 
 // VisitorsAppSpec defines the desired state of VisitorsApp
-// +k8s:openapi-gen=true
+//+k8s:openapi-gen=true
 type VisitorsAppSpec struct {
-	DatabaseImage           string `json:"databaseImage"`
-	BackendSize             int32  `json:"backendSize"`
-	BackendServiceNodePort  int32  `json:"backendServiceNodePort"`
-	FrontendTitle           string `json:"frontendTitle"`
-	FrontendSize            int32  `json:"frontendSize"`
-	FrontendServiceNodePort int32  `json:"frontendServiceNodePort"`
+	DatabaseVersion           string `json:"databaseVersion"`
+	DatabaseHostPath          string `json:"databaseHostPath"`
+	DatabaseMySQLRootPassword string `json:"databaseMySQLRootPassword"`
+
+	//+kubebuilder:validation:Minimum=1
+	BackendSize int32 `json:"backendSize"`
+
+	//+kubebuilder:validation:Minimum=30000
+	//+kubebuilder:validation:Maximum=32767
+	BackendServiceNodePort int32 `json:"backendServiceNodePort"`
+
+	FrontendTitle string `json:"frontendTitle"`
+
+	//+kubebuilder:validation:Minimum=1
+	FrontendSize int32 `json:"frontendSize"`
+
+	//+kubebuilder:validation:Minimum=30000
+	//+kubebuilder:validation:Maximum=32767
+	FrontendServiceNodePort int32 `json:"frontendServiceNodePort"`
 }
 
 // VisitorsAppStatus defines the observed state of VisitorsApp
-// +k8s:openapi-gen=true
+//+k8s:openapi-gen=true
 type VisitorsAppStatus struct {
-	//DatabaseImage string `json:"databaseImage,omitempty"`
+	DatabaseImage string `json:"databaseImage,omitempty"`
 	BackendImage  string `json:"backendImage,omitempty"`
 	FrontendImage string `json:"frontendImage,omitempty"`
 }
 
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+//+k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
 // VisitorsApp is the Schema for the visitorsapps API
-// +k8s:openapi-gen=true
-// +kubebuilder:subresource:status
+//+k8s:openapi-gen=true
+//+kubebuilder:subresource:status
 type VisitorsApp struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -62,7 +72,7 @@ type VisitorsApp struct {
 	Status VisitorsAppStatus `json:"status,omitempty"`
 }
 
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+//+k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 //+kubebuilder:object:root=true
 
 // VisitorsAppList contains a list of VisitorsApp
