@@ -15,7 +15,7 @@ import (
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-const databasePort = 3000
+const databasePort = 3306
 
 func mysqlStatefulSetName() string {
 	return "mysql"
