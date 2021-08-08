@@ -247,26 +247,6 @@ func (r *VisitorsAppReconciler) handleDatabaseChanges(ctx context.Context, v *ex
 			log.Error(err, "Failed to update StatefulSet.", "StatefulSet.Namespace", foundStatefulSet.Namespace, "StatefulSet.Name", foundStatefulSet.Name)
 			return &ctrl.Result{}, err
 		}
-
-		// Updata Backend When Database HostPath Is Modified
-		log.Info("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
-		foundBackendDeployment := &appsv1.Deployment{}
-		err := r.Get(ctx, types.NamespacedName{
-			Name:      backendDeploymentName(v),
-			Namespace: v.Namespace,
-		}, foundBackendDeployment)
-		if err != nil {
-			// The deployment may not have been created yet, so requeue
-			return &ctrl.Result{RequeueAfter: 5 * time.Second}, err
-		}
-		zero := int32(0)
-		foundBackendDeployment.Spec.Replicas = &zero
-		err = r.Update(ctx, foundBackendDeployment)
-		if err != nil {
-			log.Error(err, "Failed to update Deployment.", "Deployment.Namespace", foundBackendDeployment.Namespace, "Deployment.Name", foundBackendDeployment.Name)
-			return &ctrl.Result{}, err
-		}
-
 		// Spec updated - return and requeue
 		return &ctrl.Result{Requeue: true}, nil
 	}

@@ -30,6 +30,7 @@ func backendServiceName(v *examplecomv1beta1.VisitorsApp) string {
 func (r *VisitorsAppReconciler) backendDeployment(v *examplecomv1beta1.VisitorsApp) *appsv1.Deployment {
 	labels := labels(v, "backend")
 	backendSize := v.Spec.BackendSize
+	databaseHostPath := v.Spec.DatabaseHostPath
 
 	userSecret := &corev1.EnvVarSource{
 		SecretKeyRef: &corev1.SecretKeySelector{
@@ -84,6 +85,10 @@ func (r *VisitorsAppReconciler) backendDeployment(v *examplecomv1beta1.VisitorsA
 							{
 								Name:      "MYSQL_PASSWORD",
 								ValueFrom: passwordSecret,
+							},
+							{
+								Name:  "MYSQL_HOSTPATH",
+								Value: databaseHostPath,
 							},
 						},
 					}},
@@ -151,13 +156,26 @@ func (r *VisitorsAppReconciler) handleBackendChanges(ctx context.Context, v *exa
 	}
 
 	backendSize := v.Spec.BackendSize
+	databaseHostPath := v.Spec.DatabaseHostPath
 	backendServiceNodePort := v.Spec.BackendServiceNodePort
 
 	existingBackendSize := *foundDeployment.Spec.Replicas
+	existingDatabaseHostPath := (*foundDeployment).Spec.Template.Spec.Containers[0].Env[4].Value
 	existingBackendServiceNodePort := (*foundService).Spec.Ports[0].NodePort
 
 	if backendSize != existingBackendSize {
 		foundDeployment.Spec.Replicas = &backendSize
+		err = r.Update(ctx, foundDeployment)
+		if err != nil {
+			log.Error(err, "Failed to update Deployment.", "Deployment.Namespace", foundDeployment.Namespace, "Deployment.Name", foundDeployment.Name)
+			return &ctrl.Result{}, err
+		}
+		// Spec updated - return and requeue
+		return &ctrl.Result{Requeue: true}, nil
+	}
+
+	if databaseHostPath != existingDatabaseHostPath {
+		(*foundDeployment).Spec.Template.Spec.Containers[0].Env[4].Value = databaseHostPath
 		err = r.Update(ctx, foundDeployment)
 		if err != nil {
 			log.Error(err, "Failed to update Deployment.", "Deployment.Namespace", foundDeployment.Namespace, "Deployment.Name", foundDeployment.Name)
