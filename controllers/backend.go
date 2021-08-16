@@ -17,7 +17,7 @@ import (
 )
 
 const backendPort = 8000
-const backendImage = "jdob/visitors-service:1.0.0"
+const backendImage = "kerryduan/visitors-service:1.0.0"
 
 func backendDeploymentName(v *examplecomv1beta1.VisitorsApp) string {
 	return v.Name + "-backend"
@@ -30,19 +30,18 @@ func backendServiceName(v *examplecomv1beta1.VisitorsApp) string {
 func (r *VisitorsAppReconciler) backendDeployment(v *examplecomv1beta1.VisitorsApp) *appsv1.Deployment {
 	labels := labels(v, "backend")
 	backendSize := v.Spec.BackendSize
-	databaseHostPath := v.Spec.DatabaseHostPath
 
 	userSecret := &corev1.EnvVarSource{
 		SecretKeyRef: &corev1.SecretKeySelector{
 			LocalObjectReference: corev1.LocalObjectReference{Name: mysqlAuthName()},
-			Key:                  "username",
+			Key:                  "USER",
 		},
 	}
 
 	passwordSecret := &corev1.EnvVarSource{
 		SecretKeyRef: &corev1.SecretKeySelector{
 			LocalObjectReference: corev1.LocalObjectReference{Name: mysqlAuthName()},
-			Key:                  "password",
+			Key:                  "PASSWORD",
 		},
 	}
 
@@ -72,11 +71,15 @@ func (r *VisitorsAppReconciler) backendDeployment(v *examplecomv1beta1.VisitorsA
 						Env: []corev1.EnvVar{
 							{
 								Name:  "MYSQL_DATABASE",
-								Value: "visitors",
+								Value: "visitors_db",
 							},
 							{
-								Name:  "MYSQL_SERVICE_HOST",
-								Value: mysqlServiceName(),
+								Name:  "MYSQL_SERVICE_HOST_RW",
+								Value: mysqlServiceRWName(),
+							},
+							{
+								Name:  "MYSQL_SERVICE_HOST_RO",
+								Value: mysqlServiceROName(),
 							},
 							{
 								Name:      "MYSQL_USERNAME",
@@ -85,10 +88,6 @@ func (r *VisitorsAppReconciler) backendDeployment(v *examplecomv1beta1.VisitorsA
 							{
 								Name:      "MYSQL_PASSWORD",
 								ValueFrom: passwordSecret,
-							},
-							{
-								Name:  "MYSQL_HOSTPATH",
-								Value: databaseHostPath,
 							},
 						},
 					}},
@@ -156,26 +155,13 @@ func (r *VisitorsAppReconciler) handleBackendChanges(ctx context.Context, v *exa
 	}
 
 	backendSize := v.Spec.BackendSize
-	databaseHostPath := v.Spec.DatabaseHostPath
 	backendServiceNodePort := v.Spec.BackendServiceNodePort
 
 	existingBackendSize := *foundDeployment.Spec.Replicas
-	existingDatabaseHostPath := (*foundDeployment).Spec.Template.Spec.Containers[0].Env[4].Value
 	existingBackendServiceNodePort := (*foundService).Spec.Ports[0].NodePort
 
 	if backendSize != existingBackendSize {
 		foundDeployment.Spec.Replicas = &backendSize
-		err = r.Update(ctx, foundDeployment)
-		if err != nil {
-			log.Error(err, "Failed to update Deployment.", "Deployment.Namespace", foundDeployment.Namespace, "Deployment.Name", foundDeployment.Name)
-			return &ctrl.Result{}, err
-		}
-		// Spec updated - return and requeue
-		return &ctrl.Result{Requeue: true}, nil
-	}
-
-	if databaseHostPath != existingDatabaseHostPath {
-		(*foundDeployment).Spec.Template.Spec.Containers[0].Env[4].Value = databaseHostPath
 		err = r.Update(ctx, foundDeployment)
 		if err != nil {
 			log.Error(err, "Failed to update Deployment.", "Deployment.Namespace", foundDeployment.Namespace, "Deployment.Name", foundDeployment.Name)

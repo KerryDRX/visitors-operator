@@ -81,20 +81,6 @@ func (r *VisitorsAppReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	var result *ctrl.Result
 
 	// == MySQL ==========
-	result, err = r.ensureSecret(ctx, req, v, r.mysqlAuthSecret(v))
-	if result != nil {
-		return *result, err
-	}
-
-	result, err = r.ensureService(ctx, req, v, r.mysqlService(v))
-	if result != nil {
-		return *result, err
-	}
-
-	result, err = r.ensureStatefulSet(ctx, req, v, r.mysqlStatefulSet(v))
-	if result != nil {
-		return *result, err
-	}
 
 	mysqlRunning := r.isMysqlUp(ctx, v)
 
@@ -105,17 +91,6 @@ func (r *VisitorsAppReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 		log.Info(fmt.Sprintf("MySQL isn't running, waiting for %s", delay))
 		return ctrl.Result{RequeueAfter: delay}, nil
-	}
-
-	err = r.updateDatabaseStatus(ctx, v)
-	if err != nil {
-		// Requeue the request if the status could not be updated
-		return ctrl.Result{}, err
-	}
-
-	result, err = r.handleDatabaseChanges(ctx, v)
-	if result != nil {
-		return *result, err
 	}
 
 	log.Info("Database setup completed.")

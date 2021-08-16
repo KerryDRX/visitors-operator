@@ -28,10 +28,6 @@ import (
 // VisitorsAppSpec defines the desired state of VisitorsApp
 //+k8s:openapi-gen=true
 type VisitorsAppSpec struct {
-	DatabaseVersion           string `json:"databaseVersion"`
-	DatabaseHostPath          string `json:"databaseHostPath"`
-	DatabaseMySQLRootPassword string `json:"databaseMySQLRootPassword"`
-
 	//+kubebuilder:validation:Minimum=1
 	BackendSize int32 `json:"backendSize"`
 
@@ -52,7 +48,6 @@ type VisitorsAppSpec struct {
 // VisitorsAppStatus defines the observed state of VisitorsApp
 //+k8s:openapi-gen=true
 type VisitorsAppStatus struct {
-	DatabaseImage string `json:"databaseImage,omitempty"`
 	BackendImage  string `json:"backendImage,omitempty"`
 	FrontendImage string `json:"frontendImage,omitempty"`
 }
