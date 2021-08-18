@@ -1,0 +1,22 @@
+serviceMonitor:
+  # enabled should be set to true to enable prometheus-operator discovery of this service
+  enabled: true
+  # additionalLabels is the set of additional labels to add to the ServiceMonitor
+  additionalLabels: 
+    release: prometheus
+
+serviceAccount:
+  # Specifies whether a ServiceAccount should be created
+  create: true
+
+# mysql connection params which build the DATA_SOURCE_NAME env var of the docker container
+mysql:
+  db: "visitors_db"
+  host: "my-cluster-mysql"
+  pass: "password"
+  port: 3306
+  user: "visitors-user"
+  # secret only containing the password
+  existingPasswordSecret:
+    name: "my-secret"
+    key: "PASSWORD"

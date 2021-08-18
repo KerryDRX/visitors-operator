@@ -1,0 +1,20 @@
+apiVersion: mysql.presslabs.org/v1alpha1
+kind: MysqlBackup
+metadata:
+  name: my-cluster-backup
+
+spec:
+  # this field is required
+  clusterName: my-cluster
+
+  # if backupURL is specified then the backup will be put
+  # at this path, else the backup URL will be filled with
+  # the cluster preset backupURL and a random name
+  backupURL: gs://kerryduan-bucket/mysql/my-cluster-backup.xbackup.gz
+
+  # specify a secret where to find credentials to access the
+  # bucket
+  backupSecretName: my-cluster-backup-secret
+
+  # specify the remote deletion policy. It can be on of ["retain", "delete"]
+  remoteDeletePolicy: retain
