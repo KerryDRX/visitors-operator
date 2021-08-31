@@ -32,6 +32,7 @@ import (
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 
 	examplecomv1beta1 "github.com/ringdrx/visitors-operator/api/v1beta1"
+	//api "github.com/presslabs/mysql-operator/pkg/apis/mysql/v1alpha1"
 )
 
 // VisitorsAppReconciler reconciles a VisitorsApp object

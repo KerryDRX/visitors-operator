@@ -1,0 +1,18 @@
+apiVersion: autoscaling/v2beta2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: database-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: mysql.presslabs.org/v1alpha1
+    kind: MysqlCluster
+    name: my-cluster
+  minReplicas: 2
+  maxReplicas: 4
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70

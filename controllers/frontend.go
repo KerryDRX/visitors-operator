@@ -8,6 +8,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -61,6 +62,11 @@ func (r *VisitorsAppReconciler) frontendDeployment(v *examplecomv1beta1.Visitors
 							Name:          "visitors",
 						}},
 						Env: env,
+						Resources: corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{
+								"cpu": resource.MustParse("500m"),
+							},
+						},
 					}},
 				},
 			},

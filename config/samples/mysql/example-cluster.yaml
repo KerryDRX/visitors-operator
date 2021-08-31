@@ -9,7 +9,7 @@ spec:
   ## For setting custom docker image or specifying mysql version
   ## the image field has priority over mysqlVersion.
   image: percona:5.7.26 # must be this version to enable mysql version upgrade
-  mysqlVersion: "5.7.26"
+  mysqlVersion: "5.7.31"
 
   # initBucketURL: gs://kerryduan-bucket/mysql/my-cluster-backup.xbackup.gz
   # initBucketSecretName: my-cluster-backup-secret
@@ -58,11 +58,11 @@ spec:
   #   nodeSelector: {}
     resources:
       requests:
-        memory: 500Mi
+        memory: 250Mi
         cpu:    200m
       limit:
         memory: 500Mi
-        cpu:    200m
+        cpu:    350m
   #   tolerations: []
   #   priorityClassName:
   #   serviceAccountName: default

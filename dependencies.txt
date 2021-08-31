@@ -1,0 +1,4 @@
+helm install prometheus prometheus-community/kube-prometheus-stack
+helm install mysql-operator presslabs/mysql-operator
+helm install mysql-exporter prometheus-community/prometheus-mysql-exporter -f config/samples/mysql-exporter/values.yaml
+helm install prometheus-adapter prometheus-community/prometheus-adapter -f config/samples/prometheus-adapter/values.yaml
