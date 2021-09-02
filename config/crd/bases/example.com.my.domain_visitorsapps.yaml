@@ -36,6 +36,8 @@ spec:
           spec:
             description: VisitorsAppSpec defines the desired state of VisitorsApp
             properties:
+              backendAutoScaling:
+                type: boolean
               backendServiceNodePort:
                 format: int32
                 maximum: 32767
@@ -57,6 +59,7 @@ spec:
               frontendTitle:
                 type: string
             required:
+            - backendAutoScaling
             - backendServiceNodePort
             - backendSize
             - frontendServiceNodePort

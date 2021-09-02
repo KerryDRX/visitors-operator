@@ -58,9 +58,9 @@ spec:
   #   nodeSelector: {}
     resources:
       requests:
-        memory: 250Mi
-        cpu:    200m
-      limit:
+        memory: 200Mi
+        cpu:    100m
+      limits:
         memory: 500Mi
         cpu:    350m
   #   tolerations: []
@@ -81,9 +81,9 @@ spec:
   #           mountPath: /data/mysql
 
   ## Specify additional volume specification
-  # volumeSpec:
-  #   # https://godoc.org/k8s.io/api/core/v1#EmptyDirVolumeSource
-  #   emptyDir: {}
+  volumeSpec:
+    # # https://godoc.org/k8s.io/api/core/v1#EmptyDirVolumeSource
+    # emptyDir: {}
 
   #   # https://godoc.org/k8s.io/api/core/v1#HostPathVolumeSource
   #   hostPath:

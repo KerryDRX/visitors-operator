@@ -93,7 +93,7 @@ func (r *VisitorsAppReconciler) backendDeployment(v *examplecomv1beta1.VisitorsA
 						},
 						Resources: corev1.ResourceRequirements{
 							Requests: corev1.ResourceList{
-								"cpu": resource.MustParse("500m"),
+								"cpu": resource.MustParse("200m"),
 							},
 						},
 					}},
@@ -160,21 +160,24 @@ func (r *VisitorsAppReconciler) handleBackendChanges(ctx context.Context, v *exa
 		return &ctrl.Result{RequeueAfter: 5 * time.Second}, err
 	}
 
+	backendAutoScaling := v.Spec.BackendAutoScaling
 	backendSize := v.Spec.BackendSize
 	backendServiceNodePort := v.Spec.BackendServiceNodePort
 
 	existingBackendSize := *foundDeployment.Spec.Replicas
 	existingBackendServiceNodePort := (*foundService).Spec.Ports[0].NodePort
 
-	if backendSize != existingBackendSize {
-		foundDeployment.Spec.Replicas = &backendSize
-		err = r.Update(ctx, foundDeployment)
-		if err != nil {
-			log.Error(err, "Failed to update Deployment.", "Deployment.Namespace", foundDeployment.Namespace, "Deployment.Name", foundDeployment.Name)
-			return &ctrl.Result{}, err
+	if !backendAutoScaling {
+		if backendSize != existingBackendSize {
+			foundDeployment.Spec.Replicas = &backendSize
+			err = r.Update(ctx, foundDeployment)
+			if err != nil {
+				log.Error(err, "Failed to update Deployment.", "Deployment.Namespace", foundDeployment.Namespace, "Deployment.Name", foundDeployment.Name)
+				return &ctrl.Result{}, err
+			}
+			// Spec updated - return and requeue
+			return &ctrl.Result{Requeue: true}, nil
 		}
-		// Spec updated - return and requeue
-		return &ctrl.Result{Requeue: true}, nil
 	}
 
 	if backendServiceNodePort != existingBackendServiceNodePort {

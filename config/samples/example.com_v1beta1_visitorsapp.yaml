@@ -3,8 +3,9 @@ kind: VisitorsApp
 metadata:
   name: visitorsapp-sample
 spec:
-  backendSize: 2
-  backendServiceNodePort: 30687
+  backendSize: 1
+  backendAutoScaling: true
+  backendServiceNodePort: 30685
   frontendTitle: "visitors app"
   frontendSize: 1
-  frontendServiceNodePort: 30688
+  frontendServiceNodePort: 30686
