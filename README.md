@@ -48,7 +48,7 @@ minikube ip
 To uninstall the application, just delete the CR:
 
 ```shell
-kubectl delete-f config/samples/example.com_v1beta1_visitorsapp.yaml
+kubectl delete -f config/samples/example.com_v1beta1_visitorsapp.yaml
 ```
 
 ## Level 2: seamless upgrades
@@ -93,12 +93,24 @@ Before creating an HPA, prometheus adapter must be installed to make HPA able to
 helm install prometheus-adapter prometheus-community/prometheus-adapter -f config/samples/prometheus-adapter/values.yaml
 ```
 
-And the CRD for MysqlCluster should also be modified in order to let HPA realize which pods belong to the cluster, so that auto-scaling for the MysqlCluster can be achieved:
+### Backend Auto-scaling
+
+To enable the auto-scaling of backend, we first change backendAutoScaling in the spec of config/samples/example.com_v1beta1_visitorsapp.yaml to "true", and apply it. Then apply the HPA for backend.
+
+```shell
+kubectl apply -f config/samples/example.com_v1beta1_visitorsapp.yaml
+kubectl apply -f config/samples/autoscaling/backend-hpa.yaml
+```
+
+### Database Auto-scaling
+
+Auto-scaling for database is a little bit more tricky. The CRD for MysqlCluster should be modified in order to let HPA realize which pods belong to the cluster, so that auto-scaling for the MysqlCluster can become possible:
 
 ```shell
 kubectl apply -f config/samples/autoscaling/mysql.presslabs.org_mysqlclusters.yaml
 ```
 
+Make sure that you restart the cluster before continuing. 
 Then, apply the HPA to auto-scale the database cluster based on the CPU utilization of the MySQL pods. Of course other criteria can be used to replace this one, as long as their information is accessible from prometheus.
 
 ```shell
