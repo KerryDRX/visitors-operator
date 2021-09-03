@@ -3,7 +3,7 @@ kind: MysqlCluster
 metadata:
   name: my-cluster
 spec:
-  replicas: 2
+  replicas: 1
   secretName: my-secret
 
   ## For setting custom docker image or specifying mysql version

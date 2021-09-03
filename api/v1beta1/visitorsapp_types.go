@@ -42,6 +42,8 @@ type VisitorsAppSpec struct {
 	//+kubebuilder:validation:Minimum=1
 	FrontendSize int32 `json:"frontendSize"`
 
+	FrontendAutoScaling bool `json:"frontendAutoScaling"`
+
 	//+kubebuilder:validation:Minimum=30000
 	//+kubebuilder:validation:Maximum=32767
 	FrontendServiceNodePort int32 `json:"frontendServiceNodePort"`

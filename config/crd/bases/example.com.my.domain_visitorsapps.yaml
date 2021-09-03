@@ -47,6 +47,8 @@ spec:
                 format: int32
                 minimum: 1
                 type: integer
+              frontendAutoScaling:
+                type: boolean
               frontendServiceNodePort:
                 format: int32
                 maximum: 32767
@@ -62,6 +64,7 @@ spec:
             - backendAutoScaling
             - backendServiceNodePort
             - backendSize
+            - frontendAutoScaling
             - frontendServiceNodePort
             - frontendSize
             - frontendTitle

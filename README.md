@@ -102,6 +102,15 @@ kubectl apply -f config/samples/example.com_v1beta1_visitorsapp.yaml
 kubectl apply -f config/samples/autoscaling/backend-hpa.yaml
 ```
 
+### Frontend Auto-scaling
+
+The procedure is similar as that of the backend. First change frontendAutoScaling in the spec of config/samples/example.com_v1beta1_visitorsapp.yaml to "true", then apply the HPA.
+
+```shell
+kubectl apply -f config/samples/example.com_v1beta1_visitorsapp.yaml
+kubectl apply -f config/samples/autoscaling/frontend-hpa.yaml
+```
+
 ### Database Auto-scaling
 
 Auto-scaling for database is a little bit more tricky. The CRD for MysqlCluster should be modified in order to let HPA realize which pods belong to the cluster, so that auto-scaling for the MysqlCluster can become possible:
@@ -110,7 +119,7 @@ Auto-scaling for database is a little bit more tricky. The CRD for MysqlCluster 
 kubectl apply -f config/samples/autoscaling/mysql.presslabs.org_mysqlclusters.yaml
 ```
 
-Make sure that you restart the cluster before continuing. 
+Make sure that you restart the database cluster before continuing. 
 Then, apply the HPA to auto-scale the database cluster based on the CPU utilization of the MySQL pods. Of course other criteria can be used to replace this one, as long as their information is accessible from prometheus.
 
 ```shell

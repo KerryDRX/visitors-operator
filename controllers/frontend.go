@@ -131,6 +131,7 @@ func (r *VisitorsAppReconciler) handleFrontendChanges(ctx context.Context, v *ex
 		return &ctrl.Result{RequeueAfter: 5 * time.Second}, err
 	}
 
+	frontendAutoScaling := v.Spec.FrontendAutoScaling
 	frontendTitle := v.Spec.FrontendTitle
 	frontendSize := v.Spec.FrontendSize
 	frontendServiceNodePort := v.Spec.FrontendServiceNodePort
@@ -150,15 +151,17 @@ func (r *VisitorsAppReconciler) handleFrontendChanges(ctx context.Context, v *ex
 		return &ctrl.Result{Requeue: true}, nil
 	}
 
-	if frontendSize != existingFrontendSize {
-		foundDeployment.Spec.Replicas = &frontendSize
-		err = r.Update(ctx, foundDeployment)
-		if err != nil {
-			log.Error(err, "Failed to update Deployment.", "Deployment.Namespace", foundDeployment.Namespace, "Deployment.Name", foundDeployment.Name)
-			return &ctrl.Result{}, err
+	if !frontendAutoScaling {
+		if frontendSize != existingFrontendSize {
+			foundDeployment.Spec.Replicas = &frontendSize
+			err = r.Update(ctx, foundDeployment)
+			if err != nil {
+				log.Error(err, "Failed to update Deployment.", "Deployment.Namespace", foundDeployment.Namespace, "Deployment.Name", foundDeployment.Name)
+				return &ctrl.Result{}, err
+			}
+			// Spec updated - return and requeue
+			return &ctrl.Result{Requeue: true}, nil
 		}
-		// Spec updated - return and requeue
-		return &ctrl.Result{Requeue: true}, nil
 	}
 
 	if frontendServiceNodePort != existingFrontendServiceNodePort {
